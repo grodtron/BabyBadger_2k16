@@ -18,8 +18,8 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *myMotor_0 = AFMS.getMotor(1);
 Adafruit_DCMotor *myMotor_1 = AFMS.getMotor(2);
 
-const int PT=1;
-const int SB=0;
+const int PT=0;
+const int SB=1;
 
 void MOVE_WHEEL_FWD(bool SIDE, int  AMOUNT) { 
   if(SIDE==0) 
