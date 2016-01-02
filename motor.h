@@ -1,117 +1,134 @@
+#ifndef MOTORS_H_
+#define MOTORS_H_
 
-/*
- * Auther: Ryan Cooke
- * Subject: Concordia Eng Games Machine Motor header
- * save date:12/04/2015
- * save date:12/05/2015
- * I2C Motor shield 
- */
-#include <Wire.h>
-#include <Adafruit_MotorShield.h>
-#include "utility/Adafruit_PWMServoDriver.h"
+#define MOTOR_TWEENER_DEBUG 1
 
-class Motor {
-private:
+//#define FORWARD  HIGH
+//#define BACKWARD LOW
 
-// Create the motor shield object with the default I2C address
-Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
-Adafruit_DCMotor *myMotor_0 = AFMS.getMotor(1);
-Adafruit_DCMotor *myMotor_1 = AFMS.getMotor(2);
+const int LEFT_PWM  = 10;
+const int LEFT_DIR  = A0;
 
-const int PT=0;
-const int SB=1;
-
-void MOVE_WHEEL_FWD(bool SIDE, int  AMOUNT) { 
-  if(SIDE==0) 
-  { 
-    myMotor_0->run(FORWARD); 
-    myMotor_0->setSpeed(AMOUNT);  
-  } 
-  if(SIDE==1)
-  { 
-    myMotor_1->run(FORWARD); 
-    myMotor_1->setSpeed(AMOUNT); 
-  } 
-} 
-
-void MOVE_WHEEL_BAK(bool SIDE,int AMOUNT){ 
-  if(SIDE==0) 
-  { 
-    myMotor_0->run(BACKWARD); 
-    myMotor_0->setSpeed(AMOUNT); 
-  } 
-  if(SIDE==1) 
-  { 
-    myMotor_1->run(BACKWARD); 
-    myMotor_1->setSpeed(AMOUNT); 
-  } 
-} 
+const int RIGHT_PWM   = 5; // IN1 (enable)
+const int RIGHT_DIR   = 3; // IN2 (direction)
 
 
 
+#define MOVE_SIDE_FWD(SIDE, AMOUNT) do { \
+  analogWrite (SIDE ## _PWM, 255 - (AMOUNT)); \
+  digitalWrite(SIDE ## _DIR, HIGH); \
+} while(0)
+
+#define MOVE_SIDE_BAK(SIDE, AMOUNT) do { \
+  analogWrite (SIDE ## _PWM, 255 - (AMOUNT)); \
+  digitalWrite(SIDE ## _DIR, LOW); \
+} while(0)
+
+int sign(int x){
+  return x >= 0 ? 1 : -1;
+}
 
 
-public:
+class Motors {
+  public:
+    static const int DELAY_TIME = 4;
+    static const int MIN_SPEED  = 85;
+//    static const int MIN_SPEED  = 110;
 
-const int N_MOTORS = 2;
-
-void setup(){
-  AFMS.begin();  // create with the default frequency 1.6KHz
-   // Set the speed to start, from 0 (off) to 255 (max speed)
-  myMotor_0->setSpeed(150);
-  myMotor_0->run(FORWARD);
-  // turn on motor
-  myMotor_0->run(RELEASE);
+  private:
+    static void updateValue(int & current, int & target){
+      if(current != target){
+        // First if we are going into the range [-MIN_SPEED, MIN_SPEED], we skip either across it or to zero
+        if(abs(target) > MIN_SPEED && abs(current) < MIN_SPEED){
+          // Are we going from fwd to backward or vice versa?
+          bool switchDirections = ( 
+               (target >= 0 && current >= 0)
+            || (target <= 0 && current <= 0))
+            ? 1   // If we are not switching directions
+            : -1; // If we are switching directions
+          
+          current = sign(target) * switchDirections * MIN_SPEED;
+        }else if(abs(target) < MIN_SPEED && abs(current) < MIN_SPEED){
+          current = 0;
+          target = 0;
+        }else{
+          int delta = target - current;
+          int dir   = sign(delta);
+          delta     = abs(delta);
+          
+          current += dir * min(8, delta);  
+        }
+      }
+    }
   
-  myMotor_1->setSpeed(150);
-  myMotor_1->run(FORWARD);
-  // turn on motor
-  myMotor_1->run(RELEASE);
-}
+  public:  
+    Motors() : 
+    left(0), leftTarget(0),
+    right(0), rightTarget(0),
+    lastUpdateTime(millis() - DELAY_TIME)
+    { 
+      pinMode(RIGHT_PWM, OUTPUT);
+      pinMode(RIGHT_DIR, OUTPUT);
 
-void set_PWM(int zero, int one)// 0 is left and 1 is right wheel
-{
-  myMotor_0->setSpeed(zero);
-  myMotor_1->setSpeed(one);
-}
+      pinMode(LEFT_PWM, OUTPUT);
+      pinMode(LEFT_DIR, OUTPUT);
 
+    }
 
-void SPIN_LEFT(int AMOUNT) {  
-  MOVE_WHEEL_BAK(PT, AMOUNT); 
-  MOVE_WHEEL_FWD(SB, AMOUNT);  
-} 
+    void setSpeedImmediate(int newLeft, int newRight){
+      leftTarget  = left  = newLeft;
+      rightTarget = right = newRight;
+      update();
+    }
+  
+    void setTargetSpeed(int newLeftTarget, int newRightTarget){
+//      if(leftTarget != newLeftTarget || rightTarget != newRightTarget){
+//
+//        if(abs(newLeftTarget) < MIN_SPEED && abs(newRightTarget) < MIN_SPEED){
+//          left  = leftTarget  = 0;
+//          right = rightTarget = 0;
+//        }else{
+//          leftTarget  = newLeftTarget;
+//          rightTarget = newRightTarget;          
+//        }
+//        
+//        Debug.println("New Target: ");
+//        Debug.print  ("    Left : "); Debug.println(leftTarget);
+//        Debug.print  ("    Right: "); Debug.println(rightTarget);
+//      }
+      setSpeedImmediate(newLeftTarget, newRightTarget);
+    }
+    
+    void update(){
+      long now = millis();
+      if(now - DELAY_TIME > lastUpdateTime){
+        lastUpdateTime = now;
+        
+//        updateValue(left,  leftTarget);
+//        updateValue(right, rightTarget);
+       
+        if(left >= 0){
+          MOVE_SIDE_FWD(LEFT, left);
+        }else{
+          MOVE_SIDE_BAK(LEFT, abs(left));
+        }
+        if(right >= 0){
+          MOVE_SIDE_FWD(RIGHT, right);
+        }else{
+          MOVE_SIDE_BAK(RIGHT, abs(right));
+        }
+      }
+    }
 
-
-void SPIN_RIGHT(int AMOUNT)  {  
-  MOVE_WHEEL_FWD(PT, AMOUNT); 
-  MOVE_WHEEL_BAK(SB, AMOUNT); 
-} 
-
-void FWD(int AMOUNT) {  
-  MOVE_WHEEL_FWD(PT, AMOUNT); 
-  MOVE_WHEEL_FWD(SB, AMOUNT); 
-} 
-
-void BAK(int AMOUNT) {  
-  MOVE_WHEEL_BAK(PT, AMOUNT); 
-  MOVE_WHEEL_BAK(SB, AMOUNT);  
-} 
-
-void TURN_LEFT(int AMOUNT) {  
-  MOVE_WHEEL_FWD(PT, 50); 
-  MOVE_WHEEL_FWD(SB, AMOUNT);  
-} 
-
-void TURN_RIGHT(int AMOUNT) {  
-  MOVE_WHEEL_FWD(PT, AMOUNT); 
-  MOVE_WHEEL_FWD(SB, 50); 
-} 
-
-void  STOP() {
-  MOVE_WHEEL_FWD(PT, 0); 
-  MOVE_WHEEL_FWD(SB, 0);
-}
-
-
+    bool done(){
+      return (left == leftTarget) && (right == rightTarget);
+    }
+  private:
+    int left,  leftTarget;
+    int right, rightTarget;
+    long lastUpdateTime;
+  
 };
+
+#endif
 
