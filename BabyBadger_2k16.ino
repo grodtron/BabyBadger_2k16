@@ -8,7 +8,7 @@ int incomingByte;      // a variable to read incoming serial data into
 #include "Gyro.h"
 #include "motor.h"
 Gyro gyro;
-Motors baby;// This is the object for the 2x Motor setup
+Motor badger;// This is the object for the 2x Motor setup
 
 bool tracking=0;
 
@@ -17,19 +17,22 @@ void setup() {
   Serial.begin(9600);
   Debug.println("START");
   // initialize the LED pin as an output:
-   MOVE_SIDE_FWD(LEFT,0);
-   MOVE_SIDE_FWD(RIGHT,0);
+   badger.setup();
    gyro.callibrate();
   Debug.println("DONE SETUP");
 }
 
 void loop() {
-
   
+gyro.update();
 
- 
+Debug.print(gyro.value());
+Debug.print("/t");
+Debug.print("Corrected:");
+Debug.println(gyro.value_cor());
+  
   if(tracking==1){
-    track(1255);
+    track(1200);
   }
 
   // see if there's incoming serial data:
@@ -39,40 +42,28 @@ void loop() {
     // if it's a capital H (ASCII 72), turn on the LED:
     if (incomingByte == 'w') {
       Debug.println("FORWARD");
-      MOVE_SIDE_FWD(LEFT,255);
-      MOVE_SIDE_FWD(RIGHT,255);
+      badger.FWD(200);
     }
     // if it's an L (ASCII 76) turn off the LED:
     if (incomingByte == 's') {
       Debug.println("BACKWARD");
-      MOVE_SIDE_BAK(LEFT,255);
-      MOVE_SIDE_BAK(RIGHT,255);
+      badger.BAK(200);
     }
     if (incomingByte == 'a') {
     Debug.println("LEFT");
-      MOVE_SIDE_BAK(LEFT,255);
-      MOVE_SIDE_FWD(RIGHT,255);
+    badger.SPIN_LEFT(200);
     }    
     if (incomingByte == 'd') {
     Debug.println("RIGHT");
-      MOVE_SIDE_FWD(LEFT,255);
-      MOVE_SIDE_BAK(RIGHT,255);
+    badger.SPIN_RIGHT(200);
     }
     if (incomingByte == ' ') {
     Debug.println("STOP");
-      MOVE_SIDE_FWD(LEFT,0);
-      MOVE_SIDE_FWD(RIGHT,0);
+    badger.STOP();
     }
     if (incomingByte == 'T') {
     Debug.println("TRACK");
     tracking=1;
-    }
-    if (incomingByte == 'G') {
-    gyro.update();
-    Debug.print(gyro.value());
-    Debug.print("/t");
-    Debug.print("Corrected:");
-    Debug.println(gyro.value_cor());
     }
   }
   else{
@@ -83,21 +74,17 @@ void loop() {
 
 void track(float input){
   Debug.println("TRACKING***********************");
-  const int delta = 255;
+  const int delta = 200;
   if(gyro.value_cor()<(input-delta)){
-      MOVE_SIDE_FWD(LEFT,255);
-      MOVE_SIDE_BAK(RIGHT,255);
+    badger.SPIN_RIGHT(200);
   }
   else if(gyro.value_cor()>(input+delta)){
-      MOVE_SIDE_BAK(LEFT,255);
-      MOVE_SIDE_FWD(RIGHT,255);
+    badger.SPIN_LEFT(200);
   }
   else {
-      MOVE_SIDE_FWD(LEFT,255);
-      MOVE_SIDE_FWD(RIGHT,255);
+    badger.FWD(200);
     tracking=0;
   }
-  
 }
 
 
